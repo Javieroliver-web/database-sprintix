@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sprintix-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypass}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+      # Importante: PGDATA debe coincidir con lo definido en el Dockerfile
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      # Puerto Host : Puerto Contenedor
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Persistencia de la BD en volumen de Docker
+      - pgdata:/var/lib/postgresql/data
+      # Carpeta local para acceder a los backups generados
+      - ./backups:/backups
+    networks:
+      - sprintix-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myuser} -d ${POSTGRES_DB:-mydb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sprintix-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@sprintix.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-adminpass}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - sprintix-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+# Definición de la red que compartirán los 3 proyectos
+networks:
+  sprintix-network:
+    driver: bridge
+    name: sprintix-network
+
+volumes:
+  pgdata:
+  pgadmin-data:
